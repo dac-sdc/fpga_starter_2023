@@ -17,12 +17,12 @@ For general questions regarding this contest, please use the Slack workspace: <h
 The get started, users have to run the following command on the Ultra96 board:
 
 ```shell
-cd /home/xilinx/jupyter_notebooks
-git clone https://github.com/jgoeders/dac_sdc_2022.git
+cd /home/root/jupyter_notebooks
+git clone https://github.com/dac-sdc/fpga_starter_2023.git
 ```
-Remember the user name and password are both `xilinx` for super user.
+Remember the user name and password are both `xilinx`.
 
-After the above step is completed successfully, you will see a folder `dac_sdc_2022` under your 
+After the above step is completed successfully, you will see a folder `fpga_starter_2023` under your 
 jupyter notebook dashboard.  Open the `sample_team/dac_sdc.ipynb` notebook for directions on where to begin.
 
 ## Folder Structure
