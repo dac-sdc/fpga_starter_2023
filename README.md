@@ -1,17 +1,17 @@
 # Updates for 2023 are still in progress
 
 
-# DAC 2022 Design Contest
+# DAC 2023 Design Contest
 
-For full contest details, please see the [2022 DAC System Design Contest](https://byuccl.github.io/dac_sdc_2022/) page.
+For full contest details, please see the [2023 DAC System Design Contest](https://dac-sdc.github.io/2023/) page.
 
-For general questions regarding this contest, please use the Piazza page: piazza.com/dac_2018/winterterm12021/dacsdc2021
+For general questions regarding this contest, please use the Slack workspace: <https://join.slack.com/t/dac-sdc/shared_invite/zt-1rrtmgjad-NCYE2leBfOw8xTOp52KR7w>
 
-## Setup PYNQ on your Ultra96v2 board
+## Setup PYNQ on your Kria KV260 board
 
-  * Download the PYNQ 2.7 Ultra96v2 board image from <http://www.pynq.io/board.html>
-  * Follow the instructions to image the SD card at <https://pynq.readthedocs.io/en/latest/getting_started/pynq_image.html>.  
-  * Follow the instructions to setup and connect to the board at <https://ultra96-pynq.readthedocs.io/en/latest/getting_started.html>.
+  * Setup the Ubuntu 22.04 image on your Kria KV260 board <https://www.xilinx.com/products/som/kria/kv260-vision-starter-kit/kv260-getting-started/getting-started.html>
+    * *Note:* You may need to update the Boot FW in order to boot the Ubuntu 22.04 image.  There are instructions here <https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/1641152513/Kria+K26+SOM#Boot-FW-update-with-xmutil>.  This requires first booting the Ubuntu 20.04 image, installing the Xilinx software tools with in the Ubuntu 20.04 environment, and then using the `xlnx-config --xmutil <cmd>` tool to install the new firmware.  Follow the instructions on that page carefully.
+  * Follow the instructions at <https://github.com/Xilinx/Kria-PYNQ> to install the PYNQ system (includes Jupyter notebooks).
 
 ## Usage
 The get started, users have to run the following command on the Ultra96 board:
