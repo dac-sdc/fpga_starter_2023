@@ -1,3 +1,6 @@
+# Updates for 2023 are still in progress
+
+
 # DAC 2022 Design Contest
 
 For full contest details, please see the [2022 DAC System Design Contest](https://byuccl.github.io/dac_sdc_2022/) page.
