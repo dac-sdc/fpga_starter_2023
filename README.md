@@ -1,6 +1,3 @@
-# Updates for 2023 are still in progress
-
-
 # DAC 2023 Design Contest
 
 For full contest details, please see the [2023 DAC System Design Contest](https://dac-sdc.github.io/2023/) page.
