@@ -1,12 +1,13 @@
 # import os
+import json
 import time
 import xml.dom.minidom
 import pathlib
-import pynq
+# import pynq
 import cv2
 import sys
 
-DAC_CONTEST = pathlib.Path("/home/xilinx/jupyter_notebooks/dac_sdc_2022/")
+DAC_CONTEST = pathlib.Path("/home/root/jupyter_notebooks/fpga_starter_2023/")
 IMG_DIR = DAC_CONTEST / "images"
 RESULT_DIR = DAC_CONTEST / "result"
 
@@ -60,10 +61,10 @@ class Team:
     def run(self, callback, debug=True):
         self.__total_time = 0
         self.__total_energy = 0
-        self.__result_rectangles = []
+        self.__object_data = {}
 
-        rails = pynq.get_rails()
-        rails_to_monitor = ["1V2", "PSDDR", "INT", "PSINT_LP", "PSINT_FP", "PSPLL"]
+        # rails = pynq.get_rails()
+        # rails_to_monitor = ["1V2", "PSDDR", "INT", "PSINT_LP", "PSINT_FP", "PSPLL"]
 
         while True:
             # Load images to memory
@@ -76,9 +77,9 @@ class Team:
 
             # Run user callback, recording runtime and power usage
             start = time.time()
-            recorder = pynq.DataRecorder(*[rails[r].power for r in rails_to_monitor])
-            with recorder.record(0.05):
-                object_locations = callback(rgb_imgs)
+            # recorder = pynq.DataRecorder(*[rails[r].power for r in rails_to_monitor])
+            # with recorder.record(0.05):
+            object_locations = callback(rgb_imgs)
             end = time.time()
 
             if len(object_locations) != len(rgb_imgs):
@@ -88,13 +89,13 @@ class Team:
                     + str(len(object_locations))
                     + " object locations returned."
                 )
-            self.__result_rectangles.extend(object_locations)
+            self.__object_data = self.__object_data | object_locations
 
             runtime = end - start
-            energy = (
-                sum([recorder.frame[r + "_power"].mean() for r in rails_to_monitor])
-                * runtime
-            )
+            # energy = (
+            #     sum([recorder.frame[r + "_power"].mean() for r in rails_to_monitor])
+            #     * runtime
+            # )
 
             if debug:
                 print(
@@ -102,13 +103,14 @@ class Team:
                     self.current_batch_idx,
                     "done. Runtime =",
                     runtime,
-                    "seconds. Energy =",
-                    energy,
-                    "J.",
+                    "seconds.",
+                    # "Energy =",
+                    # energy,
+                    # "J.",
                 )
 
             self.__total_time += runtime
-            self.__total_energy += energy
+            # self.__total_energy += energy
 
             # Delete images from memory
             del rgb_imgs[:]
@@ -127,62 +129,14 @@ class Team:
         print("XML results written successfully.")
 
     def save_results_xml(self):
-        if len(self.__result_rectangles) != len(self.img_list):
-            raise ValueError("Result length not equal to number of images.")
+        if len(self.__object_data) != len(self.img_list):
+            raise ValueError(f"Result length ({self.__object_data}) not equal to number of images ({self.img_list}).")
 
-        doc = xml.dom.minidom.Document()
-        root = doc.createElement("results")
+        save_data = {
+            "runtime" : self.__total_time,
+            "objects" : self.__object_data
+        }
 
-        perf_e = doc.createElement("performance")
-
-        # Runtime
-        runtime_e = doc.createElement("runtime")
-        runtime_e.appendChild(doc.createTextNode(str(self.__total_time)))
-        perf_e.appendChild(runtime_e)
-        root.appendChild(runtime_e)
-
-        # Energy
-        energy_e = doc.createElement("energy")
-        energy_e.appendChild(doc.createTextNode(str(self.__total_energy)))
-        perf_e.appendChild(energy_e)
-        root.appendChild(energy_e)
-
-        for i, rectangle in enumerate(self.__result_rectangles):
-            image_e = root.appendChild(doc.createElement("image"))
-
-            doc.appendChild(root)
-            name_e = doc.createElement("filename")
-            name_t = doc.createTextNode(self.img_list[i].name)
-            name_e.appendChild(name_t)
-            image_e.appendChild(name_e)
-
-            size_e = doc.createElement("size")
-            node_width = doc.createElement("width")
-            node_width.appendChild(doc.createTextNode("640"))
-            node_length = doc.createElement("length")
-            node_length.appendChild(doc.createTextNode("360"))
-            size_e.appendChild(node_width)
-            size_e.appendChild(node_length)
-            image_e.appendChild(size_e)
-
-            object_node = doc.createElement("object")
-            node_bnd_box = doc.createElement("bndbox")
-            node_bnd_box_xmin = doc.createElement("xmin")
-            node_bnd_box_xmin.appendChild(doc.createTextNode(str(rectangle[0])))
-            node_bnd_box_xmax = doc.createElement("xmax")
-            node_bnd_box_xmax.appendChild(doc.createTextNode(str(rectangle[1])))
-            node_bnd_box_ymin = doc.createElement("ymin")
-            node_bnd_box_ymin.appendChild(doc.createTextNode(str(rectangle[2])))
-            node_bnd_box_ymax = doc.createElement("ymax")
-            node_bnd_box_ymax.appendChild(doc.createTextNode(str(rectangle[3])))
-            node_bnd_box.appendChild(node_bnd_box_xmin)
-            node_bnd_box.appendChild(node_bnd_box_xmax)
-            node_bnd_box.appendChild(node_bnd_box_ymin)
-            node_bnd_box.appendChild(node_bnd_box_ymax)
-
-            object_node.appendChild(node_bnd_box)
-            image_e.appendChild(object_node)
-
-        file_name = self._result_path / "results.xml"
-        with open(file_name, "w") as fp:
-            doc.writexml(fp, indent="\t", addindent="\t", newl="\n", encoding="utf-8")
+        with open('results.json', 'w', encoding='utf-8') as f:
+            json.dump(save_data, f, indent=4)
+        return
