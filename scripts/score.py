@@ -1,107 +1,207 @@
-#!/usr/bin/python3
-
+""" This script scores the results of a team's submission."""
+from argparse import ArgumentParser
+import json
+import pathlib
 import sys
-import os
-import xml.etree.ElementTree as ET
 
-def bb_intersection_over_union(boxA, boxB):
+
+def main():
+    """Main function."""
+
+    parser = ArgumentParser()
+    parser.add_argument(
+        "teams_folder", help="Path to teams folder (example: './sample_team')", type=pathlib.Path
+    )
+    parser.add_argument(
+        "label_folder",
+        help="Path to golden label directory (example: './train/label')",
+        type=pathlib.Path,
+    )
+    parser.add_argument(
+        "--multiple_teams",
+        help="Score multiple teams (teams_folder contains a directory of multiple teams)",
+        action="store_true",
+    )
+    parser.add_argument("--debug", help="Enable debug mode", action="store_true")
+    args = parser.parse_args()
+
+    teams_folders = args.teams_folder
+    if not teams_folders.is_dir():
+        sys.exit("Error: teams_folder is not a directory")
+
+    if args.multiple_teams:
+        teams_folders = [t for t in teams_folders.iterdir() if t.is_dir()]
+    else:
+        teams_folders = [teams_folders]
+
+    for team in teams_folders:
+        score_group(team, args.label_folder, args.debug)
+        print("")
+
+
+def bb_intersection_over_union(box_a, box_b):
+    """Compute the intersection over union of two bounding boxes, each specified
+    as a list of (x, y)-coordinates."""
+
     # determine the (x, y)-coordinates of the intersection rectangle
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
- 
+    x_a = max(box_a[0], box_b[0])
+    y_a = max(box_a[1], box_b[1])
+    x_b = min(box_a[2], box_b[2])
+    y_b = min(box_a[3], box_b[3])
+
     # compute the area of intersection rectangle
-    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
- 
+    inter_area = max(0, x_b - x_a + 1) * max(0, y_b - y_a + 1)
+
     # compute the area of both the prediction and ground-truth
     # rectangles
-    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
-    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
-    
+    box_a_area = (box_a[2] - box_a[0] + 1) * (box_a[3] - box_a[1] + 1)
+    box_b_area = (box_b[2] - box_b[0] + 1) * (box_b[3] - box_b[1] + 1)
+
     # compute the intersection over union by taking the intersection
     # area and dividing it by the sum of prediction + ground-truth
     # areas - the interesection area
-    iou = interArea / float(boxAArea + boxBArea - interArea)
- 
+    iou = inter_area / float(box_a_area + box_b_area - inter_area)
+
     # return the intersection over union value
     return iou
 
-def main():
-    if len(sys.argv) != 4:
-        print("Usage:\n\tscore.py <teams_folder> <results_xml_folder> <soln_xml_folder>")
-        sys.exit(1)
 
-    teams_folder = sys.argv[1]
-    results_xml_folder = sys.argv[2]
-    soln_xml = os.path.normpath(sys.argv[3])
+def get_closest_object(golden_object, candidate_user_objects):
+    """Given a list of candidate user objects, find the one that has the largest IOU
+    with the golden object and is the same type.
+    Golden object has properties x, y, width and height and type.
+    The function returns a tuple with the candiate object with the largest IOU, and the IoU value.
+    """
+    max_iou = -1
+    max_iou_object = None
+    for user_object in candidate_user_objects:
+        if user_object["type"] != golden_object["type"]:
+            continue
 
-    teams = [ item for item in os.listdir(teams_folder) if os.path.isdir(os.path.join(teams_folder, item)) ]
-    # teams = [f.path for f in os.scandir(teams_folder) if f.is_dir()]    
-    for team in teams:        
-        score_group(os.path.join(results_xml_folder, team, "results.xml"), soln_xml)
-        print("")
+        iou = bb_intersection_over_union(
+            [
+                golden_object["x"],
+                golden_object["y"],
+                golden_object["x"] + golden_object["width"],
+                golden_object["y"] + golden_object["height"],
+            ],
+            [
+                user_object["x"],
+                user_object["y"],
+                user_object["x"] + user_object["width"],
+                user_object["y"] + user_object["height"],
+            ],
+        )
 
-def score_group(group_xml, soln_xml):
-    group = group_xml.split(os.sep)[-2]
-    print("Scoring group", group)
+        if iou > max_iou:
+            max_iou = iou
+            max_iou_object = user_object
+
+    return max_iou_object, max_iou
+
+
+def score_group(group, label_dir_path, debug):
+    """Score a group"""
+
+    result_json = group / "results.json"
+    print("Scoring group", group, "results file:", result_json)
 
     # Parse tree
-    if not os.path.isfile(group_xml):
-        print("Missing results:", group_xml)
-        return
-    root = ET.parse(group_xml).getroot()
+    if not result_json.is_file():
+        sys.exit("Missing results:", result_json)
+
+    result_data = json.load(result_json.open())
 
     # Print runtime
-    runtime = float(root.find('runtime').text)
-    print("Runtime (s):", round(runtime,1))
-
-    # Print energy
-    energy = float(root.find('energy').text)
-    print("Energy (J):", round(energy,1))
-
-    # Print power
-    power = energy / runtime
-    print("Avg Power (W):", round(power,3))
+    runtime = float(result_data["runtime"])
+    print("Runtime (s):", round(runtime, 1))
 
     # Score object detection
-    ious = []
+    global_true_positives = 0
+    global_false_positives = 0
+    global_false_negatives = 0
+
+    label_files = sorted(label_dir_path.iterdir())
+
     # img = root.find('image')
-    for img in root.findall('image'):        
-        filename = img.find('filename').text
-        filenum = filename.split(".")[0]        
-        # print(filenum)
+    for img in label_files:
+        true_positives = 0
+        false_positives = 0
+        false_negatives = 0
 
-        # User box
-        user_box = []
-        xmin = int(img.find('object/bndbox/xmin').text)
-        ymin = int(img.find('object/bndbox/ymin').text)
-        xmax = int(img.find('object/bndbox/xmax').text)
-        ymax = int(img.find('object/bndbox/ymax').text)
-        user_box.append(min(xmin, xmax))
-        user_box.append(min(ymin, ymax))
-        user_box.append(max(xmin, xmax))
-        user_box.append(max(ymin, ymax))
-        # print(user_box)
+        filename = img.with_suffix(".jpg").name
+        if debug:
+            print(filename)
 
-        # Soln box
-        soln_root = ET.parse(os.path.join(soln_xml, str(filenum) + ".xml")).getroot()
-        soln_box = []
-        soln_box.append(int(soln_root.find('object/bndbox/xmin').text))
-        soln_box.append(int(soln_root.find('object/bndbox/ymin').text))
-        soln_box.append(int(soln_root.find('object/bndbox/xmax').text))
-        soln_box.append(int(soln_root.find('object/bndbox/ymax').text))
-        # print(soln_box)
+        if filename not in result_data["objects"]:
+            print("Skipping", filename, "because it was not in results.json")
+            continue
 
-        iou = bb_intersection_over_union(user_box, soln_box)
-        ious.append(iou)
-    print("# images:", len(ious))
-    # print("iou min:", round(min(ious), 2))
-    # print("iou max:", round(max(ious), 2))
-    print("iou avg:", round(sum(ious) / len(ious), 3))
+        golden_data = json.load(img.open())
+        user_data = result_data["objects"][filename]
 
-    fps = len(ious) / runtime
-    print("fps: ", round(fps, 2))  
+        for labelled_object in golden_data:
+            if labelled_object["type"] >= 8:
+                continue
+
+            if debug:
+                print("  Golden object:", labelled_object)
+
+            # Find the closest object in the user's results
+            user_object, iou = get_closest_object(labelled_object, user_data)
+
+            # Print closes object and IoU
+            if debug:
+                print("    Closest object:", user_object)
+                if user_object:
+                    print("    IoU:", iou)
+
+            if user_object and iou > 0.5:
+                if debug:
+                    print("    IoU > 0.5, true positive")
+                true_positives += 1
+                user_data.remove(user_object)
+            else:
+                false_negatives += 1
+                if debug:
+                    print("    IoU <= 0.5, false negative")
+
+        # False positives are any objects left in the user's results that have type between 1 and 7
+        false_positives = len([o for o in user_data if o["type"] >= 1 and o["type"] <= 7])
+
+        if debug:
+            print("  Remaining user objects:")
+            for obj in user_data:
+                print("    ", obj)
+
+        if debug:
+            print("  True positives:", true_positives)
+            print("  False positives:", false_positives)
+            print("  False negatives:", false_negatives)
+
+        global_true_positives += true_positives
+        global_false_positives += false_positives
+        global_false_negatives += false_negatives
+
+    if debug:
+        print("")
+        print("Global true positives:", global_true_positives)
+        print("Global false positives:", global_false_positives)
+        print("Global false negatives:", global_false_negatives)
+        print("")
+
+    # Calculate precision, recall and F1 score
+    precision = global_true_positives / (global_true_positives + global_false_positives)
+    recall = global_true_positives / (global_true_positives + global_false_negatives)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+
+    print("# images:", len(label_files))
+    print("Precision:", round(precision, 3))
+    print("Recall:", round(recall, 3))
+    print("F1 score:", round(f1_score, 3))
+
+    fps = len(label_files) / runtime
+    print("fps: ", round(fps, 2))
 
 
 if __name__ == "__main__":
