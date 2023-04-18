@@ -124,11 +124,11 @@ class Team:
             "J.",
         )
 
-        print("Savings results to XML...")
-        self.save_results_xml()
-        print("XML results written successfully.")
+        print("Savings results to JSON...")
+        self.save_results_json()
+        print("JSON results written successfully.")
 
-    def save_results_xml(self):
+    def save_results_json(self):
         if len(self.__object_data) != len(self.img_list):
             raise ValueError(f"Result length ({self.__object_data}) not equal to number of images ({self.img_list}).")
 
