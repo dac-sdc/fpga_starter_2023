@@ -132,6 +132,9 @@ create_project ${_xil_proj_name_} ./${_xil_proj_name_} -part xck26-sfvc784-2LV-c
 # Set the directory path for the new project
 set proj_dir [get_property directory [current_project]]
 
+set design_name sensors96b
+
+
 # Set project properties
 set obj [current_project]
 set_property -name "board_part" -value "xilinx.com:kv260_som:part0:1.4" -objects $obj
