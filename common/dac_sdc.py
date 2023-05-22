@@ -7,8 +7,8 @@ import pathlib
 import cv2
 import sys
 
-DAC_CONTEST = pathlib.Path("/home/root/jupyter_notebooks/fpga_starter_2023/")
-IMG_DIR = DAC_CONTEST / "images"
+DAC_CONTEST = pathlib.Path("/home/root/jupyter_notebooks/fpga_starter_2023/prelim1/")
+IMG_DIR = DAC_CONTEST.parent / "images"
 RESULT_DIR = DAC_CONTEST / "result"
 
 BATCH_SIZE = 1000

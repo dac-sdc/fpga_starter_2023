@@ -108,7 +108,7 @@ def score_group(group, label_dir_path, debug):
 
     # Parse tree
     if not result_json.is_file():
-        sys.exit("Missing results:", result_json)
+        sys.exit(f"Missing results: {result_json}")
 
     result_data = json.load(result_json.open())
 
@@ -182,6 +182,8 @@ def score_group(group, label_dir_path, debug):
         global_true_positives += true_positives
         global_false_positives += false_positives
         global_false_negatives += false_negatives
+
+        # break
 
     if debug:
         print("")
